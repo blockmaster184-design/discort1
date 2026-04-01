@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jonli Video Muloqot</title>
+    
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #121212;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            text-align: center;
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 90%;
+            max-width: 800px;
+        }
+
+        .video-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        video {
+            width: 100%;
+            height: 240px;
+            background: #000;
+            border-radius: 10px;
+            object-fit: cover;
+            border: 2px solid #333;
+        }
+
+        .id-section {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            width: 200px;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .btn-call { background-color: #27ae60; color: white; }
+        .btn-call:hover { background-color: #2ecc71; }
+        
+        #my-id {
+            color: #f1c40f;
+            font-size: 1.2em;
+            word-break: break-all;
+        }
+
+        .status {
+            font-size: 0.9em;
+            color: #bbb;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Video Qo'ng'iroq</h2>
+
+        <div class="id-section">
+            <p>Sizning ID raqamingiz:</p>
+            <div id="my-id">Yuklanmoqda...</div>
+            <p class="status">Ushbu ID-ni do'stingizga yuboring</p>
+        </div>
+
+        <div class="id-section">
+            <input type="text" id="peer-id-input" placeholder="Do'stingiz ID-sini kiriting">
+            <button class="btn-call" onclick="makeCall()">Qo'ng'iroq qilish</button>
+        </div>
+
+        <div class="video-grid">
+            <div>
+                <p>Siz (Lokal)</p>
+                <video id="local-video" autoplay muted playsinline></video>
+            </div>
+            <div>
+                <p>Do'stingiz (Masofaviy)</p>
+                <video id="remote-video" autoplay playsinline></video>
+            </div>
+        </div>
+        <p id="call-status"></p>
+    </div>
+
+    <script>
+        let peer = new Peer(); 
+        let localStream;
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
+        const statusText = document.getElementById('call-status');
+
+        // 1. Kamera va mikrofonga ruxsat olish
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                localStream = stream;
+                localVideo.srcObject = stream;
+                console.log("Kamera tayyor.");
+            })
+            .catch(err => {
+                console.error("Kameraga ruxsat berilmadi:", err);
+                alert("Kameraga ruxsat bermasangiz ilova ishlamaydi!");
+            });
+
+        // 2. PeerJS orqali shaxsiy ID olish
+        peer.on('open', (id) => {
+            document.getElementById('my-id').innerText = id;
+        });
+
+        // 3. Qo'ng'iroq kelganda javob berish
+        peer.on('call', (call) => {
+            statusText.innerText = "Kiruvchi qo'ng'iroq...";
+            call.answer(localStream); // O'z videomizni yuboramiz
+            
+            call.on('stream', (remoteStream) => {
+                remoteVideo.srcObject = remoteStream; // Do'stimiz videosini ko'rsatamiz
+                statusText.innerText = "Aloqa o'rnatildi!";
+            });
+        });
+
+        // 4. Qo'ng'iroqni boshlash funksiyasi
+        function makeCall() {
+            const remoteId = document.getElementById('peer-id-input').value;
+            if (!remoteId) {
+                alert("Iltimos, do'stingizning ID raqamini kiriting!");
+                return;
+            }
+
+            statusText.innerText = "Bog'lanilmoqda...";
+            const call = peer.call(remoteId, localStream);
+            
+            call.on('stream', (remoteStream) => {
+                remoteVideo.srcObject = remoteStream;
+                statusText.innerText = "Aloqa o'rnatildi!";
+            });
+
+            call.on('error', (err) => {
+                alert("Xatolik: " + err);
+                statusText.innerText = "Xatolik yuz berdi.";
+            });
+        }
+
+        // Xatoliklarni nazorat qilish
+        peer.on('error', (err) => {
+            console.error("Peer xatosi:", err);
+            if(err.type === 'peer-disconnected') statusText.innerText = "Aloqa uzildi.";
+        });
+    </script>
+
+</body>
+</html>
